@@ -4,3 +4,6 @@ python-multipart
 pdfplumber
 python-docx
 groq
+python-dotenv
+requests
+PyJWT
