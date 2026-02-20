@@ -1,6 +1,10 @@
+import os
 import requests
 
-NODE_BACKEND_URL = "http://localhost:5000"
+NODE_BACKEND_URL = os.getenv("MAIN_BACKEND_URL")
+
+if not NODE_BACKEND_URL:
+    raise RuntimeError("MAIN_BACKEND_URL is not set")
 
 def fetch_user_profile(token: str):
     response = requests.get(
