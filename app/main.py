@@ -458,6 +458,7 @@ app.include_router(router)
 
 @app.websocket("/ws/rooms/{room_id}/{user_id}")
 async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
+    await websocket.accept()
     await room_signaling.connect(room_id, user_id, websocket)
 
     try:
