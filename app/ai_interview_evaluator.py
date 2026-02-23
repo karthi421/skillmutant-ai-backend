@@ -4,7 +4,7 @@ import re
 from groq import Groq
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-GROQ_MODEL = "llama3-8b-8192"
+GROQ_MODEL = "llama-3.1-70b-versatile"
 
 
 def evaluate_full_interview(answers):

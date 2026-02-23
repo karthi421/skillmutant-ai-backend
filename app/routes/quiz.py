@@ -6,7 +6,7 @@ from groq import Groq
 
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-GROQ_MODEL = "llama3-8b-8192"
+GROQ_MODEL = "llama-3.1-70b-versatile"
 router = APIRouter(prefix="/ai")
 
 class QuizRequest(BaseModel):
@@ -41,62 +41,6 @@ Format:
   ]
 }}
 """
-    '''
-    try:
-        res = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "mistral",
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.5
-                }
-            },
-            timeout=90
-        )
-
-        raw = res.json().get("response", "")
-
-        match = re.search(r"\{.*\}", raw, re.S)
-        if not match:
-            raise ValueError("Invalid JSON from model")
-
-        parsed = json.loads(match.group())
-        questions = parsed.get("questions", [])
-
-        # Hard topic filter
-        final = []
-        seen = set()
-
-        for q in questions:
-            text = q.get("question", "").lower()
-            if topic.lower() not in text:
-                continue
-            if text in seen:
-                continue
-            seen.add(text)
-            final.append(q)
-
-        if not final:
-            final = [{
-                "question": f"What is {topic}?",
-                "options": ["A","B","C","D"],
-                "answer": "A"
-            }]
-
-        return { "questions": final[:count] }
-
-    except Exception as e:
-        print("QUIZ ERROR:", e)
-        return {
-            "questions": [{
-                "question": f"Basics of {topic}",
-                "options": ["A","B","C","D"],
-                "answer": "A"
-            }]
-        }
-    '''
     try:
         completion = groq_client.chat.completions.create(
             model=GROQ_MODEL,
@@ -153,3 +97,62 @@ Format:
                 "answer": "A"
             }]
         }
+    
+
+
+    '''
+    try:
+        res = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": GROQ_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.5
+                }
+            },
+            timeout=90
+        )
+
+        raw = res.json().get("response", "")
+
+        match = re.search(r"\{.*\}", raw, re.S)
+        if not match:
+            raise ValueError("Invalid JSON from model")
+
+        parsed = json.loads(match.group())
+        questions = parsed.get("questions", [])
+
+        # Hard topic filter
+        final = []
+        seen = set()
+
+        for q in questions:
+            text = q.get("question", "").lower()
+            if topic.lower() not in text:
+                continue
+            if text in seen:
+                continue
+            seen.add(text)
+            final.append(q)
+
+        if not final:
+            final = [{
+                "question": f"What is {topic}?",
+                "options": ["A","B","C","D"],
+                "answer": "A"
+            }]
+
+        return { "questions": final[:count] }
+
+    except Exception as e:
+        print("QUIZ ERROR:", e)
+        return {
+            "questions": [{
+                "question": f"Basics of {topic}",
+                "options": ["A","B","C","D"],
+                "answer": "A"
+            }]
+        }
+    '''

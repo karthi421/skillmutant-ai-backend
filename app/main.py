@@ -15,7 +15,7 @@ router = APIRouter()
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 load_dotenv()  # ⬅️ THIS IS REQUIRED
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-GROQ_MODEL = "llama3-8b-8192"
+GROQ_MODEL = "llama-3.1-70b-versatile"
 # ================== CORE AI MODULES ==================
 from app.skill_extractor import (
     extract_skills,
@@ -38,7 +38,7 @@ from app.ai_room_chat import router as ai_room_router
 from app.routes.account import router as account_router
 from app.routes.quiz import router as quiz_router
 
-
+from app.routes.dashboard_ai import router as dashboard_ai_router
 
 
 
@@ -67,7 +67,7 @@ app.include_router(rooms_router)
 app.include_router(ai_room_router)
 app.include_router(account_router)
 app.include_router(quiz_router)
-
+app.include_router(dashboard_ai_router)
 
 # ================== UTILITIES ==================
 def extract_text_from_pdf(file: UploadFile) -> str:
