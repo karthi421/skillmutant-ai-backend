@@ -2,7 +2,7 @@ import os
 from groq import Groq
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-GROQ_MODEL = "llama-3.1-70b-versatile"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
 def generate_ai_questions(project_description: str):
