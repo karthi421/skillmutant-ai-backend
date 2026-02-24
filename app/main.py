@@ -306,15 +306,18 @@ def recommend_jobs(data: Dict):
     return {
         "jobs": matched
     }
-
-
 @app.post("/ai/start-interview")
 def start_interview(data: dict):
     question = generate_interview_question(
-        data["resume_skills"],
-        data["job_role"]
+        skills=data.get("resume_skills", []),
+        role=data.get("job_role", "Software Engineer"),
+        company=data.get("company", "a tech company"),
+        round_type=data.get("round_type", "technical_core"),
+        difficulty=data.get("difficulty", "medium"),
+        previous_questions=data.get("previous_questions", []),
     )
-    return { "question": question }
+    return {"question": question}
+
 
 
 @app.post("/ai/evaluate-answer")
