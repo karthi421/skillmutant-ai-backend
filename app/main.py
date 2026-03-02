@@ -459,27 +459,9 @@ JSON format:
 
 app.include_router(router)
 
-from jose import jwt
-from fastapi import Query
-
-SECRET_KEY = os.getenv("JWT_SECRET") 
-ALGORITHM = "HS256"
-
-@app.websocket("/ws/rooms/{room_id}")
-async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
-
-    await websocket.accept()
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("id")
-        name = payload.get("name")
-    except:
-        await websocket.close(code=1008)
-        return
-
-    await room_signaling.connect(room_id, user_id, name, websocket)
-    
+@app.websocket("/ws/rooms/{room_id}/{user_id}")
+async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
+    await room_signaling.connect(room_id, user_id, websocket)
 
     try:
         
