@@ -458,7 +458,7 @@ JSON format:
 
 
 app.include_router(router)
-'''
+
 @app.websocket("/ws/rooms/{room_id}/{user_id}")
 async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
     await room_signaling.connect(room_id, user_id, websocket)
@@ -502,60 +502,6 @@ async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
                     exclude=user_id
                 )
 
-
-    except WebSocketDisconnect:
-        await room_signaling.disconnect(room_id, user_id)
-'''
-
-from fastapi import WebSocket, WebSocketDisconnect
-from app.dependencies.auth import JWT_SECRET, JWT_ALGORITHM
-import jwt
-
-@app.websocket("/ws/rooms/{room_id}")
-async def room_ws(websocket: WebSocket, room_id: str):
-    room_id = room_id.strip().upper()
-    token = websocket.query_params.get("token")
-
-    if not token:
-        await websocket.close(code=1008)
-        return
-
-    try:
-        user = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        await websocket.close(code=1008)
-        return
-    except jwt.InvalidTokenError:
-        await websocket.close(code=1008)
-        return
-
-    user_id = str(user.get("id"))
-
-    await room_signaling.connect(room_id, user, websocket)
-
-    try:
-        while True:
-            message = await websocket.receive_json()
-            msg_type = message.get("type")
-
-            if msg_type in ["offer", "answer", "ice"]:
-                await room_signaling.relay(
-                    room_id,
-                    sender_id=user_id,
-                    payload={
-                        **message,
-                        "target": message.get("to") or message.get("target")
-                    }
-                )
-            else:
-                await room_signaling.broadcast(
-                    room_id,
-                    {
-                        **message,
-                        "from": user_id
-                    },
-                    exclude=user_id
-                )
 
     except WebSocketDisconnect:
         await room_signaling.disconnect(room_id, user_id)
@@ -712,16 +658,3 @@ FORMAT:
                 })
 
     return {"questions": valid[:final_count]}
-
-
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://skillmutant-frontend.vercel.app"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
