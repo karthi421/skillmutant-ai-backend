@@ -235,3 +235,4 @@ class RoomSignalingManager:
                 **payload,
                 "from": sender_id
             })
+room_signaling = RoomSignalingManager()
