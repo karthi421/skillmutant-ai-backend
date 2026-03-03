@@ -512,12 +512,13 @@ async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
 
     room_id = room_id.strip().upper()
     display_name = websocket.query_params.get("name")
+    avatar = websocket.query_params.get("avatar")
 
     if not display_name:
         await websocket.close(code=1008)
         return
 
-    await room_signaling.connect(room_id, user_id, display_name, websocket)
+    await room_signaling.connect(room_id, user_id, display_name, avatar,websocket)
 
     try:
         while True:
