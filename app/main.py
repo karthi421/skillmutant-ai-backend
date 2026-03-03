@@ -458,7 +458,7 @@ JSON format:
 
 
 app.include_router(router)
-
+'''
 @app.websocket("/ws/rooms/{room_id}/{user_id}")
 async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
     await room_signaling.connect(room_id, user_id, websocket)
@@ -502,6 +502,46 @@ async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
                     exclude=user_id
                 )
 
+
+    except WebSocketDisconnect:
+        await room_signaling.disconnect(room_id, user_id)
+'''
+
+@app.websocket("/ws/rooms/{room_id}/{user_id}")
+async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
+
+    room_id = room_id.strip().upper()
+    display_name = websocket.query_params.get("name")
+
+    if not display_name:
+        await websocket.close(code=1008)
+        return
+
+    await room_signaling.connect(room_id, user_id, display_name, websocket)
+
+    try:
+        while True:
+            message = await websocket.receive_json()
+            msg_type = message.get("type")
+
+            if msg_type in ["offer", "answer", "ice"]:
+                await room_signaling.relay(
+                    room_id,
+                    sender_id=user_id,
+                    payload={
+                        **message,
+                        "target": message.get("to") or message.get("target")
+                    }
+                )
+            else:
+                await room_signaling.broadcast(
+                    room_id,
+                    {
+                        **message,
+                        "from": user_id
+                    },
+                    exclude=user_id
+                )
 
     except WebSocketDisconnect:
         await room_signaling.disconnect(room_id, user_id)

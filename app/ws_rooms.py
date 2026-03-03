@@ -1,3 +1,4 @@
+'''
 from fastapi import WebSocket, WebSocketDisconnect
 from collections import defaultdict
 from typing import Dict
@@ -96,6 +97,120 @@ class RoomSignalingManager:
         ws = self.rooms.get(room_id, {}).get(target)
         if ws:
             await ws.send_json({
+                **payload,
+                "from": sender_id
+            })
+
+
+room_signaling = RoomSignalingManager()
+'''
+from fastapi import WebSocket
+from collections import defaultdict
+from typing import Dict
+
+MAX_MEMBERS = 8
+
+
+class RoomSignalingManager:
+    def __init__(self):
+        # room_id -> { user_id -> {"ws": WebSocket, "name": str} }
+        self.rooms: Dict[str, Dict[str, dict]] = defaultdict(dict)
+
+    async def connect(self, room_id: str, user_id: str, name: str, websocket: WebSocket):
+
+        if len(self.rooms[room_id]) >= MAX_MEMBERS:
+            await websocket.close(code=1008)
+            return
+
+        await websocket.accept()
+
+        self.rooms[room_id][user_id] = {
+            "ws": websocket,
+            "name": name
+        }
+
+        # Send full member list to new user
+        await websocket.send_json({
+            "type": "init",
+            "members": [
+                {
+                    "id": uid,
+                    "name": data["name"]
+                }
+                for uid, data in self.rooms[room_id].items()
+            ]
+        })
+
+        # Notify others
+        await self.broadcast(
+            room_id,
+            {
+                "type": "user-joined",
+                "user": {
+                    "id": user_id,
+                    "name": name
+                }
+            },
+            exclude=user_id
+        )
+
+        await self.broadcast_count(room_id)
+
+    async def disconnect(self, room_id: str, user_id: str):
+
+        if room_id in self.rooms and user_id in self.rooms[room_id]:
+
+            del self.rooms[room_id][user_id]
+
+            await self.broadcast(
+                room_id,
+                {
+                    "type": "user-left",
+                    "user_id": user_id
+                }
+            )
+
+            await self.broadcast_count(room_id)
+
+            if not self.rooms[room_id]:
+                del self.rooms[room_id]
+
+    async def broadcast(self, room_id: str, message: dict, exclude: str = None):
+
+        dead_users = []
+
+        for uid, data in self.rooms.get(room_id, {}).items():
+            if uid == exclude:
+                continue
+
+            try:
+                await data["ws"].send_json(message)
+            except:
+                dead_users.append(uid)
+
+        for uid in dead_users:
+            del self.rooms[room_id][uid]
+
+    async def broadcast_count(self, room_id: str):
+        await self.broadcast(
+            room_id,
+            {
+                "type": "count",
+                "members": len(self.rooms.get(room_id, {})),
+                "max": MAX_MEMBERS
+            }
+        )
+
+    async def relay(self, room_id: str, sender_id: str, payload: dict):
+
+        target = payload.get("target")
+        if not target:
+            return
+
+        target_data = self.rooms.get(room_id, {}).get(str(target))
+
+        if target_data:
+            await target_data["ws"].send_json({
                 **payload,
                 "from": sender_id
             })
