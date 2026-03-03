@@ -513,7 +513,7 @@ import jwt
 
 @app.websocket("/ws/rooms/{room_id}")
 async def room_ws(websocket: WebSocket, room_id: str):
-
+    room_id = room_id.strip().upper()
     token = websocket.query_params.get("token")
 
     if not token:
