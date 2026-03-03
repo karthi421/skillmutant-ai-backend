@@ -116,7 +116,7 @@ class RoomSignalingManager:
         # room_id -> { user_id -> {"ws": WebSocket, "name": str} }
         self.rooms: Dict[str, Dict[str, dict]] = defaultdict(dict)
 
-    async def connect(self, room_id: str, user_id: str, name: str, avatar: str, websocket: WebSocket):
+    async def connect(self, room_id: str, user_id: str, name: str, websocket: WebSocket):
 
         if len(self.rooms[room_id]) >= MAX_MEMBERS:
             await websocket.close(code=1008)
@@ -126,8 +126,7 @@ class RoomSignalingManager:
 
         self.rooms[room_id][user_id] = {
             "ws": websocket,
-            "name": name,
-            "avatar": None
+            "name": name
         }
 
         # Send full member list to new user
@@ -136,8 +135,7 @@ class RoomSignalingManager:
             "members": [
                 {
                     "id": uid,
-                    "name": data["name"],
-                    "avatar": data["avatar"]
+                    "name": data["name"]
                 }
                 for uid, data in self.rooms[room_id].items()
             ]

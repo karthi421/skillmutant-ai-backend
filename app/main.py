@@ -512,13 +512,13 @@ async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
 
     room_id = room_id.strip().upper()
     display_name = websocket.query_params.get("name")
-    avatar = websocket.query_params.get("avatar")
+    
 
     if not display_name:
         await websocket.close(code=1008)
         return
 
-    await room_signaling.connect(room_id, user_id, display_name, avatar,websocket)
+    await room_signaling.connect(room_id, user_id, display_name, websocket)
 
     try:
         while True:
@@ -534,16 +534,6 @@ async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
                         "target": message.get("to") or message.get("target")
                     }
                 )
-            elif msg_type == "profile-update":
-                await room_signaling.broadcast(
-                room_id,
-                {
-                    "type": "profile-update",
-                    "user_id": user_id,
-                    "avatar": message.get("avatar")
-                },
-                exclude=None
-            )
             else:
                 await room_signaling.broadcast(
                     room_id,
