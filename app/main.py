@@ -507,14 +507,27 @@ async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
         await room_signaling.disconnect(room_id, user_id)
 '''
 
-from fastapi import WebSocket, WebSocketDisconnect, Query
-from app.dependencies.auth import get_current_user_from_token
+from fastapi import WebSocket, WebSocketDisconnect
+from app.dependencies.auth import JWT_SECRET, JWT_ALGORITHM
+import jwt
 
 @app.websocket("/ws/rooms/{room_id}")
-async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
+async def room_ws(websocket: WebSocket, room_id: str):
 
-    # 🔐 Extract user from JWT
-    user = get_current_user_from_token(token)
+    token = websocket.query_params.get("token")
+
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    try:
+        user = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        await websocket.close(code=1008)
+        return
+    except jwt.InvalidTokenError:
+        await websocket.close(code=1008)
+        return
 
     user_id = str(user.get("id"))
 
@@ -525,7 +538,6 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
             message = await websocket.receive_json()
             msg_type = message.get("type")
 
-            # 🔁 WebRTC signaling relay
             if msg_type in ["offer", "answer", "ice"]:
                 await room_signaling.relay(
                     room_id,
@@ -535,19 +547,6 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
                         "target": message.get("to") or message.get("target")
                     }
                 )
-
-            # 🎤 Media status updates
-            elif msg_type == "media-status":
-                await room_signaling.broadcast(
-                    room_id,
-                    {
-                        **message,
-                        "from": user_id
-                    },
-                    exclude=user_id
-                )
-
-            # ✋ Hand raise / reactions / speaking
             else:
                 await room_signaling.broadcast(
                     room_id,
@@ -560,8 +559,6 @@ async def room_ws(websocket: WebSocket, room_id: str, token: str = Query(...)):
 
     except WebSocketDisconnect:
         await room_signaling.disconnect(room_id, user_id)
-
-
 MAIN_BACKEND_URL = os.getenv("MAIN_BACKEND_URL", "http://localhost:5000")
 
 def log_progress_activity(

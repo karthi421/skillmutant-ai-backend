@@ -24,3 +24,4 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
