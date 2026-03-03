@@ -127,7 +127,7 @@ class RoomSignalingManager:
         self.rooms[room_id][user_id] = {
             "ws": websocket,
             "name": name,
-            "avatar": avatar
+            "avatar": None
         }
 
         # Send full member list to new user
