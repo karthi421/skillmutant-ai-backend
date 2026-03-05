@@ -39,10 +39,10 @@ from app.routes.account import router as account_router
 from app.routes.quiz import router as quiz_router
 
 from app.routes.dashboard_ai import router as dashboard_ai_router
-
-
-
-
+from app.ats_analyzer import compute_ats_score
+from app.skill_graph import build_skill_graph, detect_skill_gaps
+from app.learning_roadmap import generate_learning_roadmap
+from app.interview_coach import generate_followup_question
 
 
 
@@ -108,6 +108,9 @@ def analyze_resume(
     # ---------- Raw skill extraction ----------
     raw_skills = extract_skills(resume_text)
     skills = normalize_skills(raw_skills)
+    skill_graph = build_skill_graph(skills)
+
+    missing_skills = detect_skill_gaps(skills)
 
     # ---------- Categorization + confidence ----------
     categories, confidence = extract_and_categorize_skills(raw_skills)
@@ -143,7 +146,11 @@ def analyze_resume(
         project_ideas = generate_project_ideas(skills=skills)
 
     # ---------- ATS Score ----------
-    ats_score = min(95, 50 + len(skills) * 4)
+    ats_score, ats_breakdown = compute_ats_score(
+    resume_text,
+    skills,
+    target_role
+)
 
     # ---------- Final response ----------
     if token:
@@ -154,50 +161,47 @@ def analyze_resume(
         )
 
     return {
-        # ===== SKILL GRAPH (CRITICAL) =====
-        "categories": categories,
-        "confidence": confidence,
+    # ===== SKILL GRAPH =====
+    "categories": categories,
+    "confidence": confidence,
+    "skill_graph": skill_graph,
 
-        # ===== ATS =====
-        "ats_score": ats_score,
-        "ats_verdict": "Resume analyzed successfully",
-        "ats_checklist": [
-            {
-                "item": "Keyword match",
-                "status": True,
-                "fix": ""
-            },
-            {
-                "item": "Clear section headings",
-                "status": False,
-                "fix": "Use Skills / Experience / Projects headings"
-            }
-        ],
+    # ===== ATS =====
+    "ats_score": ats_score,
+    "ats_breakdown": ats_breakdown,
+    "ats_verdict": "Resume analyzed successfully",
+    "ats_checklist": [
+        {
+            "item": "Keyword match",
+            "status": True,
+            "fix": ""
+        },
+        {
+            "item": "Clear section headings",
+            "status": False,
+            "fix": "Use Skills / Experience / Projects headings"
+        }
+    ],
 
-        # ===== CORE INTELLIGENCE =====
-        "projects": projects,
-        "resume_suggestions": resume_suggestions,
-        "project_ideas": project_ideas,
+    # ===== CORE INTELLIGENCE =====
+    "projects": projects,
+    "resume_suggestions": resume_suggestions,
+    "project_ideas": project_ideas,
 
-        # ===== COURSE INPUT =====
-        "current_skills": skills,
-        "missing_skills": [],
-        "readiness": ats_score,
-        "target_role": target_role,
-        "skills": skills,                 # ✅ for ResumeAnalysis.jsx
-        "best_role": target_role
-    }
+    # ===== COURSE INPUT =====
+    "current_skills": skills,
+    "missing_skills": missing_skills,
+    "readiness": ats_score,
+    "target_role": target_role,
+    "skills": skills,
+    "best_role": target_role
+   }
 
 # =========================================================
 # ================= COURSE RECOMMENDER ====================
 # =========================================================
 @app.post("/ai/recommend-courses")
 def recommend_courses(data: Dict):
-    """
-    FINAL LOGIC:
-    1. User search (absolute priority)
-    2. AI resume-based fallback
-    """
 
     # -----------------------------
     # USER SEARCH MODE (STRICT)
@@ -221,51 +225,35 @@ def recommend_courses(data: Dict):
         }
 
     # -----------------------------
-    # AI RESUME MODE (DEFAULT)
+    # AI RESUME MODE
     # -----------------------------
     current_skills = data.get("current_skills", [])
     target_role = data.get("target_role", "")
     readiness = data.get("readiness", 0)
 
-    EXPECTED_SKILLS_BY_ROLE = {
-        "Frontend Developer": ["React", "JavaScript", "TypeScript"],
-        "Backend Developer": ["Python", "FastAPI", "SQL"],
-        "Full Stack Developer": ["React", "Node.js", "SQL"],
-        "Software Developer": ["DSA", "OOP", "System Design"],
-    }
-
-    expected = EXPECTED_SKILLS_BY_ROLE.get(target_role, [])
-    missing_skills = [s for s in expected if s not in current_skills]
-
-    learning_plan = generate_learning_plan(
-        current_skills=current_skills,
-        missing_skills=missing_skills,
-        target_role=target_role,
-        readiness=readiness
+    # 🔹 Generate learning roadmap
+    roadmap = generate_learning_roadmap(
+        current_skills,
+        target_role
     )
-
-    if not learning_plan:
-        learning_plan = [
-            {
-                "skill": skill,
-                "priority_reason": "Recommended to strengthen your profile"
-            }
-            for skill in current_skills[:3]
-        ]
 
     recommendations = []
 
-    for step in learning_plan:
-        skill = step["skill"]
-        courses = fetch_courses_for_skill(skill)
-        enriched = enrich_courses(skill, courses)
+    for phase in roadmap:
 
-        recommendations.append({
-            "skill": skill,
-            "priority_reason": step["priority_reason"],
-            "courses": enriched
-        })
+        for skill in phase["skills"]:
+
+            courses = fetch_courses_for_skill(skill)
+            enriched = enrich_courses(skill, courses)
+
+            recommendations.append({
+                "skill": skill,
+                "priority_reason": f"Part of {phase['phase']} roadmap",
+                "courses": enriched
+            })
+
     token = data.get("token")
+
     if token:
         log_progress_activity(
             token,
@@ -273,9 +261,10 @@ def recommend_courses(data: Dict):
             "Viewed AI course recommendations"
         )
 
-    return { "recommendations": recommendations }
-# app/main.py
-
+    return {
+        "roadmap": roadmap,
+        "recommendations": recommendations
+    }
 
 
 
@@ -458,54 +447,23 @@ JSON format:
 
 
 app.include_router(router)
-'''
-@app.websocket("/ws/rooms/{room_id}/{user_id}")
-async def room_ws(websocket: WebSocket, room_id: str, user_id: str):
-    await room_signaling.connect(room_id, user_id, websocket)
+@app.post("/ai/interview-followup")
+def interview_followup(data: dict):
 
-    try:
-        
-        #while True:
-        #    message = await websocket.receive_json()
+    question = data.get("question")
+    answer = data.get("answer")
+    role = data.get("role", "Software Engineer")
 
-            # Broadcast media status updates
-        #    if message.get("type") == "media-status":
-        #        await room_signaling.broadcast(
-        #            room_id,
-        #            message,
-        #            exclude=user_id
-        #        )
-        while True:
-            message = await websocket.receive_json()
+    followup = generate_followup_question(
+        question,
+        answer,
+        role
+    )
 
-            msg_type = message.get("type")
+    return {
+        "followup_question": followup
+    }
 
-    # 🔁 WebRTC signaling relay
-            if msg_type in ["offer", "answer", "ice"]:
-                await room_signaling.relay(
-                    room_id,
-                    sender_id=user_id,
-                    payload={
-                        **message,
-                        "target": message.get("to") or message.get("target")
-                    }
-                )
-
-    # Broadcast media status updates
-            elif msg_type == "media-status":
-                await room_signaling.broadcast(
-                    room_id,
-                    {
-                        **message,
-                        "from": user_id
-                    },
-                    exclude=user_id
-                )
-
-
-    except WebSocketDisconnect:
-        await room_signaling.disconnect(room_id, user_id)
-'''
 
 @app.websocket("/ws/rooms/{room_id}/{user_id}")
 async def room_ws(websocket: WebSocket, room_id: str, user_id: str):

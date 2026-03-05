@@ -1,5 +1,5 @@
 from typing import List, Dict
-
+from app.job_scorer import compute_job_match_score
 KEYWORD_SCORE = {
     "developer": 20,
     "engineer": 20,
@@ -35,18 +35,25 @@ def generate_reason(job: Dict, skills: List[str]) -> str:
     return "Recommended based on your resume and market demand"
 
 
-def match_jobs_to_resume(
-    skills: List[str],
-    target_role: str,
-    jobs: List[Dict]
-) -> List[Dict]:
+def match_jobs_to_resume(skills, target_role, jobs):
 
-    enriched = []
+    ranked = []
 
     for job in jobs:
-        job["relevance"] = calculate_relevance(job, skills, target_role)
-        job["reason"] = generate_reason(job, skills)
-        enriched.append(job)
 
-    enriched.sort(key=lambda x: x["relevance"], reverse=True)
-    return enriched
+        score = compute_job_match_score(
+            skills,
+            job,
+            target_role
+        )
+
+        job["match_score"] = score
+
+        ranked.append(job)
+
+    ranked.sort(
+        key=lambda j: j["match_score"],
+        reverse=True
+    )
+
+    return ranked[:20]
