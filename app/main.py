@@ -15,7 +15,7 @@ router = APIRouter()
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 load_dotenv()  # ⬅️ THIS IS REQUIRED
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-20b"
 # ================== CORE AI MODULES ==================
 from app.skill_extractor import (
     extract_skills,

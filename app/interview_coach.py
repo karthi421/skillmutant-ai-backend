@@ -4,7 +4,7 @@ from groq import Groq
 import os
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-20b"
 
 
 def generate_followup_question(question, answer, role):
